@@ -26,6 +26,7 @@ pSigma = -4*pi*z0*sigma;
 iSigma = fSigma.*exp(1i*pSigma);
 %calculate ifft of iSigma
 [intensity,phase,zDataInter]=ifftOfIsigma(iSigma,sigma(1),sigma(end),nPoint);
+[zeroPhase1,zeroPhase2] = findZeroPhase(zDataInter,phase,0);
 
 figure(1);
 subplot(2,2,1);
@@ -116,6 +117,31 @@ intensity = interpn(zData,intensity,zDataInter,'linear');
 phase = interpn(zData,phase,zDataInter,'linear');
 end
 
-function findZeroPhase()
+function [zeroData1,zeroData2] = findZeroPhase(zData,phaseData,zeroPoint)
+diff = 0.01;
+positivePhase = phaseData(phaseData>0);
+negativePhase = phaseData(phaseData<0);
+while true 
+    if length(find(abs(positivePhase-zeroPoint)<diff))>1
+       lastDiff = diff;
+       diff = diff/2;
+    elseif (length(find(abs(positivePhase-zeroPoint)<diff))== 0)
+        diff = (diff + lastDiff)/2;
+    else
+        zeroPhase1= positivePhase(abs(positivePhase-zeroPoint)<diff);
+        break
+    end
+end
+while true 
+    if length(find(abs(negativePhase-zeroPoint)<diff))>1
+       lastDiff = diff;
+       diff = diff/2;
+    elseif (length(find(abs(negativePhase-zeroPoint)<diff))== 0)
+        diff = (diff + lastDiff)/2;
+    else
+        zeroPhase2= negativePhase(abs(negativePhase-zeroPoint)<diff);
+        break
+    end
+end
 
 end
