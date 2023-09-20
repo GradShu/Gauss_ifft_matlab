@@ -26,7 +26,7 @@ pSigma = -4*pi*z0*sigma;
 iSigma = fSigma.*exp(1i*pSigma);
 %calculate ifft of iSigma
 [intensity,phase,zDataInter]=ifftOfIsigma(iSigma,sigma(1),sigma(end),nPoint);
-[zeroPhase1,zeroPhase2] = findZeroPhase(zDataInter,phase,0);
+zeroPhase = findZeroPhase(zDataInter,phase,0);
 
 figure(1);
 subplot(2,2,1);
@@ -36,9 +36,59 @@ setImage(223,sigma,pSigma,'Wavenumber \sigma(\mum^{-1})','Phase(rad)');
 subplot(2,2,2);
 setImage(222,zDataInter,intensity,'Position z(\mum)','Intensity(a.u.)');
 subplot(2,2,4);
-setImage(224,zDataInter,phase,'Position z(\mum)','Phase(rad)');
+setImage(224,zDataInter,phase,'Position z(\mum)','Phase(rad)',zeroPhase);
 
-function setImage(imageMark,xData,yData,xlabel,ylabel)
+function [intensity,phase,zDataInter]=ifftOfIsigma(input,sigmaStart,sigmaEnd,nPoint)
+%This function use for calculating ifft of iSigma.
+%The output is intensity and phase after ifft.
+deltaSigma = (sigmaEnd-sigmaStart)/(nPoint-1);
+deltaZ = 1/(2*nPoint*deltaSigma);
+zData = (1:nPoint)*deltaZ;
+intensity = abs(ifft(input));
+phase = angle(ifft(input));
+%interpolation
+zDataInter = linspace(zData(1),zData(end),nPoint*10);
+intensity = interpn(zData,intensity,zDataInter,'linear');
+phase = interpn(zData,phase,zDataInter,'linear');
+end
+
+function zeroPhase = findZeroPhase(zData,phaseData,zeroPoint)
+diff = 0.01;
+%limit the range of zData,about (zp-lambda/8,zp+lambda/8)
+LimZData = zData(zData>(10-(1/1.45)/8)&zData<(10+(1/1.45)/8));
+phaseData = phaseData(zData>(10-(1/1.45)/8)&zData<(10+(1/1.45)/8));
+% phaseData = phaseData()
+positivePhase = phaseData(phaseData>0);
+negativePhase = phaseData(phaseData<0);
+while true 
+    if length(find(abs(positivePhase-zeroPoint)<diff))>1
+       lastDiff = diff;
+       diff = diff/2;
+    elseif (isempty(find(abs(positivePhase-zeroPoint)<diff, 1)))
+        diff = (diff + lastDiff)/2;
+    else
+        zeroPhase1= positivePhase(abs(positivePhase-zeroPoint)<diff);
+        break
+    end
+end
+while true 
+    if length(find(abs(negativePhase-zeroPoint)<diff))>1
+       lastDiff = diff;
+       diff = diff/2;
+    elseif (isempty(find(abs(negativePhase-zeroPoint)<diff, 1)))
+        diff = (diff + lastDiff)/2;
+    else
+        zeroPhase2= negativePhase(abs(negativePhase-zeroPoint)<diff);
+        break
+    end
+end
+zeroData1 = LimZData(phaseData==zeroPhase1);
+zeroData2 = LimZData(phaseData==zeroPhase2);
+zeroPhase = ((0-zeroPhase2)*(zeroData1-zeroData2))/(zeroPhase1-zeroPhase2)...
+            +zeroData2;
+end
+
+function setImage(imageMark,xData,yData,xlabel,ylabel,zeroPhase)
 %This function setImage use for setting image property, such as axes, line,
 %colour and so on. 
 %ampMaxZ:The abscissa where the maximum amplitude value is located.
@@ -79,11 +129,16 @@ elseif imageMark == 222
 else
     hold on
     zeroLine = plot([ampMaxZ-2,ampMaxZ+2],[0,0]);
+    zeroPhaseLine = plot([zeroPhase,zeroPhase],[-3.14,0]);
     set(gca,'Xlim', [ampMaxZ-2 ampMaxZ+2]);
+    set(gca,'Ylim', [-3.14 3.14]);
     set(yDataLine,'color',      'blue',...
                   'LineStyle',  '-',...
                   'LineWidth',   2);
     set(zeroLine, 'color',       'k',...
+                  'LineStyle',   '--',...
+                  'LineWidth',    2);
+    set(zeroPhaseLine, 'color',  'k',...
                   'LineStyle',   '--',...
                   'LineWidth',    2);
 end
@@ -101,47 +156,4 @@ set(get(gca,'XLabel'), 'String',xlabel,...
 set(get(gca,'YLabel'), 'String',ylabel,...
                        'FontName','Arial',...
                        'FontSize',14);
-end
-
-function [intensity,phase,zDataInter]=ifftOfIsigma(input,sigmaStart,sigmaEnd,nPoint)
-%This function use for calculating ifft of iSigma.
-%The output is intensity and phase after ifft.
-deltaSigma = (sigmaEnd-sigmaStart)/(nPoint-1);
-deltaZ = 1/(2*nPoint*deltaSigma);
-zData = (1:nPoint)*deltaZ;
-intensity = abs(ifft(input));
-phase = angle(ifft(input));
-%interpolation
-zDataInter = linspace(zData(1),zData(end),nPoint*10);
-intensity = interpn(zData,intensity,zDataInter,'linear');
-phase = interpn(zData,phase,zDataInter,'linear');
-end
-
-function [zeroData1,zeroData2] = findZeroPhase(zData,phaseData,zeroPoint)
-diff = 0.01;
-positivePhase = phaseData(phaseData>0);
-negativePhase = phaseData(phaseData<0);
-while true 
-    if length(find(abs(positivePhase-zeroPoint)<diff))>1
-       lastDiff = diff;
-       diff = diff/2;
-    elseif (length(find(abs(positivePhase-zeroPoint)<diff))== 0)
-        diff = (diff + lastDiff)/2;
-    else
-        zeroPhase1= positivePhase(abs(positivePhase-zeroPoint)<diff);
-        break
-    end
-end
-while true 
-    if length(find(abs(negativePhase-zeroPoint)<diff))>1
-       lastDiff = diff;
-       diff = diff/2;
-    elseif (length(find(abs(negativePhase-zeroPoint)<diff))== 0)
-        diff = (diff + lastDiff)/2;
-    else
-        zeroPhase2= negativePhase(abs(negativePhase-zeroPoint)<diff);
-        break
-    end
-end
-
 end
